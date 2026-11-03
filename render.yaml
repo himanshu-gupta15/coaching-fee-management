@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: coaching-fee-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: CLIENT_URL
+        sync: false
+      - key: INSTITUTE_NAME
+        value: BrightPath Academy
+      - key: INSTITUTE_TZ_OFFSET_MINUTES
+        value: "330"
+      - key: REMINDER_DAYS_BEFORE_DUE
+        value: "5"

@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "seed": "tsx src/seed/run.ts",
     "test": "jest --runInBand",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:prod": "node dist/seed/run.js"
   },
   "engines": {
     "node": ">=20"
