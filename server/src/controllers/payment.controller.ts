@@ -14,11 +14,15 @@ import { created, ok, pageMeta } from '../utils/response';
 
 export async function createPayment(req: Request, res: Response) {
   const b = req.valid!.body;
-  const payment = await recordPayment(req, {
-    ...b,
-    // A date-only payment date is stored as midday local time to avoid TZ edge cases.
-    paidAt: b.paidAt ? new Date(startOfLocalDay(b.paidAt).getTime() + 12 * 3600_000) : undefined,
-  });
+  let paidAt: Date | undefined;
+  if (b.paidAt) {
+    const dayStart = startOfLocalDay(b.paidAt).getTime();
+    if (dayStart > Date.now()) throw AppError.unprocessable('INVALID_DATE', 'Payment date cannot be in the future');
+    // Date-only input is stored as midday local time, but never later than now
+    // (so a payment dated today can be recorded before noon).
+    paidAt = new Date(Math.min(dayStart + 12 * 3600_000, Date.now()));
+  }
+  const payment = await recordPayment(req, { ...b, paidAt });
   const fee = await FeeRecord.findById(payment.feeRecord);
   return created(res, { payment, fee: fee ? { _id: fee._id, amount: fee.amount, amountPaid: fee.amountPaid, status: fee.status, balance: fee.amount - fee.amountPaid } : null });
 }

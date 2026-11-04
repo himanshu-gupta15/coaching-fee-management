@@ -46,7 +46,7 @@ export function timeAgo(d: string | Date) {
 
 export const STATUS_META: Record<FeeStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   paid: { label: 'Paid', variant: 'success' },
-  partial: { label: 'Partially paid', variant: 'info' },
+  partial: { label: 'Partial', variant: 'info' },
   pending: { label: 'Pending', variant: 'warning' },
   overdue: { label: 'Overdue', variant: 'danger' },
   cancelled: { label: 'Cancelled', variant: 'neutral' },

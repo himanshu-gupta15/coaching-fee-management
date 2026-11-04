@@ -4,8 +4,8 @@ import { apiToken, findStudentId, login, RAJESH, SUNITA } from './helpers';
 test.describe('Parent portal', () => {
   test("parent logs in and sees their child's fee status", async ({ page }) => {
     await login(page, SUNITA);
-    await expect(page.getByRole('heading', { name: /Hello, Sunita/ })).toBeVisible();
-    await expect(page.getByText('Total amount due')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome back, Sunita/ })).toBeVisible();
+    await expect(page.getByText('Total outstanding')).toBeVisible();
     await expect(page.getByText(/is overdue/).first()).toBeVisible();
     await page.getByRole('link', { name: /Rohan Verma/ }).click();
     await expect(page.getByRole('heading', { name: 'Rohan Verma' })).toBeVisible();

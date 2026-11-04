@@ -5,13 +5,13 @@ export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) 
   <div className={cn('rounded-xl border bg-card text-card-foreground shadow-[var(--shadow-card)]', className)} {...p} />
 );
 export const CardHeader = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col gap-1 p-5 pb-3', className)} {...p} />
+  <div className={cn('flex flex-col gap-0.5 p-5 pb-3', className)} {...p} />
 );
 export const CardTitle = ({ className, ...p }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={cn('text-[15px] font-semibold leading-tight tracking-tight', className)} {...p} />
+  <h3 className={cn('text-[15px] font-semibold leading-tight text-foreground', className)} {...p} />
 );
 export const CardDescription = ({ className, ...p }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={cn('text-sm text-muted-foreground', className)} {...p} />
+  <p className={cn('text-[13px] text-muted-foreground', className)} {...p} />
 );
 export const CardContent = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('p-5 pt-0', className)} {...p} />

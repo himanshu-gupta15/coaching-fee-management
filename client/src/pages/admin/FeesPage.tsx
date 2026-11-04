@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CalendarPlus, MoreHorizontal, Pencil, Plus, Trash2, Wallet, Ban } from 'lucide-react';
+import { Ban, CalendarPlus, Info, MoreHorizontal, Pencil, Plus, Receipt, Trash2, Wallet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,8 @@ import { Select } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { EmptyState, ErrorState, Field, PageHeader, Pagination, SearchInput } from '@/components/common';
+import { Dot, EmptyState, ErrorState, Field, PageHeader, Pagination, SearchInput, SegmentedBar } from '@/components/common';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FeeList } from '@/features/fees/FeeList';
 import { FeeRecordDialog, FeeStructureDialog, GenerateFeesDialog } from '@/features/fees/FeeDialogs';
@@ -19,17 +21,56 @@ import { api, errMsg } from '@/services/api';
 import { FREQ_LABEL, inr } from '@/utils/format';
 import type { FeeRecord, FeeStructure } from '@/types';
 
+const STATUS_TABS = [
+  { value: 'all', label: 'All' }, { value: 'outstanding', label: 'Unpaid' }, { value: 'overdue', label: 'Overdue' }, { value: 'partial', label: 'Partial' },
+  { value: 'pending', label: 'Pending' }, { value: 'paid', label: 'Paid' }, { value: 'cancelled', label: 'Cancelled' },
+];
+
+interface Stats { totalBilled: number; totalCollected: number; pendingAmount: number; overdueAmount: number; overdueCount: number; collectionRate: number }
+
+function SummaryCard({ stats }: { stats: Stats | null }) {
+  const notDue = stats ? stats.pendingAmount - stats.overdueAmount : 0;
+  const cols = [
+    { label: 'Total billed', value: stats?.totalBilled, sub: undefined, dot: null, info: 'All fee records except cancelled ones' },
+    { label: 'Paid', value: stats?.totalCollected, sub: stats && `${stats.collectionRate}% collected`, dot: 'success' as const },
+    { label: 'Pending', value: notDue, sub: 'Not yet due', dot: 'warning' as const, info: 'Unpaid balances not yet past due' },
+    { label: 'Overdue', value: stats?.overdueAmount, sub: stats && `${stats.overdueCount} fees`, dot: 'danger' as const, info: 'Unpaid balances past due date' },
+  ];
+  return (
+    <Card className="mb-4 p-5">
+      <div className="grid grid-cols-2 gap-y-4 lg:grid-cols-4 lg:divide-x">
+        {cols.map((c) => (
+          <div key={c.label} className="lg:px-6 lg:first:pl-0">
+            <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">{c.dot && <Dot tone={c.dot} />}{c.label}{c.info && <span title={c.info}><Info className="h-3.5 w-3.5 text-slate-400" aria-label={c.info} /></span>}</p>
+            <p className="mt-1 text-xl font-semibold tabular sm:text-[22px]">{stats ? inr(c.value ?? 0) : '—'}</p>
+            {c.sub && <p className="text-xs text-muted-foreground">{c.sub}</p>}
+          </div>
+        ))}
+      </div>
+      {stats && <SegmentedBar className="mt-5" parts={[
+        { label: 'Paid', value: stats.totalCollected, className: 'bg-emerald-500' },
+        { label: 'Pending', value: notDue, className: 'bg-amber-400' },
+        { label: 'Overdue', value: stats.overdueAmount, className: 'bg-red-500' },
+      ]} />}
+    </Card>
+  );
+}
+
 function Records() {
+  const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
-  const [status, setStatus] = useState('all');
+  const status = params.get('status') ?? 'all';
+  const setStatus = (v: string) => { const n = new URLSearchParams(params); if (v === 'all') n.delete('status'); else n.set('status', v); setParams(n, { replace: true }); };
+  const dash = useApi<{ stats: Stats }>('/reports/dashboard');
   const [plan, setPlan] = useState('all');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [q, status, plan, dueFrom, dueTo]);
   const plans = useApi<FeeStructure[]>('/fees/structures');
-  const { data, meta, loading, error, reload } = useApi<FeeRecord[]>('/fees/records', { search: q, status, feeStructure: plan, dueFrom, dueTo, page, limit: 20 });
+  const { data, meta, loading, error, reload: reloadList } = useApi<FeeRecord[]>('/fees/records', { search: q, status, feeStructure: plan, dueFrom, dueTo, page, limit: 15 });
+  const reload = () => { void reloadList(); void dash.reload(); };
   const [payFee, setPayFee] = useState<FeeRecord | null>(null);
   const [edit, setEdit] = useState<{ open: boolean; fee?: FeeRecord | null }>({ open: false });
   const [gen, setGen] = useState(false);
@@ -43,26 +84,38 @@ function Records() {
   };
   return (
     <>
-      <div className="mb-4 flex flex-wrap justify-end gap-2">
-        <Button variant="outline" onClick={() => setEdit({ open: true })}><Plus />One-off fee</Button>
-        <Button onClick={() => setGen(true)}><CalendarPlus />Generate fees</Button>
-      </div>
-      <Card>
-        <div className="grid gap-2 border-b p-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_200px_150px_150px]">
+      <SummaryCard stats={dash.data?.stats ?? null} />
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1" role="tablist" aria-label="Filter by status">
+            {STATUS_TABS.map((t) => (
+              <button key={t.value} role="tab" aria-selected={status === t.value} onClick={() => setStatus(t.value)}
+                className={cn('whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] font-medium', status === t.value ? 'bg-white text-foreground shadow-sm' : 'text-slate-600 hover:text-foreground')}>{t.label}</button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setEdit({ open: true })}><Plus />One-off fee</Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setGen(true)}><CalendarPlus />Generate fees</Button>
+          </div>
+        </div>
+        <div className="grid gap-2 border-b p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[1fr_200px_auto]">
           <SearchInput value={search} onChange={setSearch} placeholder="Search student name or ID" className="sm:col-span-2 lg:col-span-1" />
-          <Select aria-label="Status" value={status} onValueChange={setStatus} options={[{ value: 'all', label: 'All statuses' }, { value: 'outstanding', label: 'All unpaid' }, { value: 'overdue', label: 'Overdue' }, { value: 'pending', label: 'Pending' }, { value: 'partial', label: 'Partially paid' }, { value: 'paid', label: 'Paid' }, { value: 'cancelled', label: 'Cancelled' }]} />
           <Select aria-label="Fee plan" value={plan} onValueChange={setPlan} options={[{ value: 'all', label: 'All fee plans' }, ...(plans.data ?? []).map((p) => ({ value: p._id, label: p.name }))]} />
-          <Input type="date" aria-label="Due from" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} />
-          <Input type="date" aria-label="Due to" value={dueTo} onChange={(e) => setDueTo(e.target.value)} />
+          <div className="flex items-center gap-2 text-[13px] text-muted-foreground sm:col-span-2 lg:col-span-1">
+            <span className="whitespace-nowrap">Due from</span>
+            <Input type="date" aria-label="Due from" className="min-w-0 lg:w-[150px]" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} />
+            <span>to</span>
+            <Input type="date" aria-label="Due to" className="min-w-0 lg:w-[150px]" value={dueTo} onChange={(e) => setDueTo(e.target.value)} />
+          </div>
         </div>
         {error && !data ? <ErrorState message={error} onRetry={reload} /> : (
           <FeeList items={data} loading={loading} emptyText="Try changing the filters, or generate this month's fees."
             actions={(f) => (
               <div className="flex justify-end gap-1">
-                {f.balance > 0 && f.status !== 'cancelled' && <Button size="sm" variant="soft" onClick={() => setPayFee(f)}>Record payment</Button>}
+                {f.balance > 0 && f.status !== 'cancelled' && <Button size="sm" variant="soft" onClick={() => setPayFee(f)}><Receipt />Record payment</Button>}
                 {f.status !== 'cancelled' && (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`More actions for ${f.title}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`More actions for ${f.title}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => setEdit({ open: true, fee: f })}><Pencil />Edit</DropdownMenuItem>
                       {f.amountPaid === 0 && <DropdownMenuItem destructive onSelect={() => setCancel(f)}><Ban />Cancel fee</DropdownMenuItem>}
@@ -72,7 +125,7 @@ function Records() {
               </div>
             )} />
         )}
-        <Pagination meta={meta} onPage={setPage} />
+        <Pagination meta={meta} onPage={setPage} noun="fee records" />
       </Card>
       <RecordPaymentDialog open={!!payFee} onOpenChange={(o) => !o && setPayFee(null)} fee={payFee} onRecorded={reload} />
       <FeeRecordDialog open={edit.open} onOpenChange={(o) => setEdit({ open: o })} fee={edit.fee} onSaved={reload} />
@@ -138,9 +191,9 @@ function Plans() {
 export default function FeesPage() {
   return (
     <>
-      <PageHeader title="Fees" description="Fee records, plans and monthly generation" />
+      <PageHeader title="Fee Management" description="Every fee issued to students, what has been paid against it, and what is still due." />
       <Tabs defaultValue="records">
-        <TabsList className="mb-4"><TabsTrigger value="records">Fee records</TabsTrigger><TabsTrigger value="plans">Fee plans</TabsTrigger></TabsList>
+        <TabsList variant="underline" className="mb-5"><TabsTrigger value="records">Fee records</TabsTrigger><TabsTrigger value="plans">Fee plans</TabsTrigger></TabsList>
         <TabsContent value="records"><Records /></TabsContent>
         <TabsContent value="plans"><Plans /></TabsContent>
       </Tabs>

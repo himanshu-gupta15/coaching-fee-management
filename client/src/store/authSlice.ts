@@ -9,10 +9,10 @@ interface AuthState {
 }
 const initialState: AuthState = { user: null, status: tokenStore.get() ? 'idle' : 'ready', error: null };
 
-export const login = createAsyncThunk('auth/login', async (body: { email: string; password: string }, { rejectWithValue }) => {
+export const login = createAsyncThunk('auth/login', async ({ remember = true, ...body }: { email: string; password: string; remember?: boolean }, { rejectWithValue }) => {
   try {
     const { data } = await api.post('/auth/login', body);
-    tokenStore.set(data.data.token);
+    tokenStore.set(data.data.token, remember);
     return data.data.user as User;
   } catch (e) {
     return rejectWithValue(apiError(e).message);

@@ -1,29 +1,30 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { GraduationCap, MoreHorizontal, Pencil, Plus, Archive, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Avatar, EmptyState, ErrorState, PageHeader, Pagination, SearchInput, TableSkeleton } from '@/components/common';
 import { StudentFormDialog } from '@/features/students/StudentFormDialog';
+import { StudentDrawer } from '@/features/students/StudentDrawer';
+import { StatusBadge } from '@/components/common';
 import { useApi, useDebounced } from '@/hooks/useApi';
 import { api, errMsg } from '@/services/api';
 import { inr } from '@/utils/format';
 import type { Student } from '@/types';
 
 const FEE_BADGE = {
-  overdue: <Badge variant="danger">Overdue</Badge>,
-  outstanding: <Badge variant="warning">Dues pending</Badge>,
-  clear: <Badge variant="success">Clear</Badge>,
+  overdue: <StatusBadge status="overdue" />,
+  outstanding: <StatusBadge status="pending" />,
+  clear: <StatusBadge status="paid" />,
 };
 
 export default function StudentsPage() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('search') ?? '');
   const q = useDebounced(search);
   const [course, setCourse] = useState('all');
@@ -36,13 +37,16 @@ export default function StudentsPage() {
   const [archiving, setArchiving] = useState<Student | null>(null);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  useEffect(() => setPage(1), [q, course, batch, status, feeStatus]);
+  const location = useLocation();
+  const [quick, setQuick] = useState<string | null>(null);
+  // Searches submitted from the top bar while already on this page.
   useEffect(() => {
-    const next = new URLSearchParams();
-    if (q) next.set('search', q);
-    if (feeStatus !== 'all') next.set('feeStatus', feeStatus);
-    setParams(next, { replace: true });
-  }, [q, feeStatus, setParams]);
+    const s = (location.state as { search?: string } | null)?.search;
+    if (typeof s === 'string') setSearch(s);
+  }, [location.state]);
+  useEffect(() => setPage(1), [q, course, batch, status, feeStatus]);
+  // Note: filters are read from the URL on arrival but not written back while typing.
+  // Writing them back raced with navigation away from this page (e.g. "Full profile").
 
   const filters = useApi<{ courses: string[]; batches: string[] }>('/students/filters');
   const { data, meta, loading, error, reload } = useApi<Student[]>('/students', { search: q, course, batch, status, feeStatus, page, limit: 15 });
@@ -62,7 +66,8 @@ export default function StudentsPage() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${s.fullName}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => navigate(`/admin/students/${s._id}`)}><Eye />View details</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setQuick(s._id)}><Eye />Quick view</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate(`/admin/students/${s._id}`)}><Eye />Full profile</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => { setEditing(s); setFormOpen(true); }}><Pencil />Edit</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem destructive onSelect={() => setArchiving(s)}><Archive />Archive student</DropdownMenuItem>
@@ -72,14 +77,14 @@ export default function StudentsPage() {
 
   return (
     <>
-      <PageHeader title="Students" description={meta ? `${meta.total} student${meta.total === 1 ? '' : 's'}` : 'Manage enrolled students'}
+      <PageHeader title="Students" description={meta ? `${meta.total} student${meta.total === 1 ? '' : 's'} enrolled across all classes and batches` : 'Manage enrolled students'}
         actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus />Add student</Button>} />
       <Card>
         <div className="grid gap-2 border-b p-3 sm:grid-cols-2 lg:grid-cols-[1fr_repeat(4,minmax(0,160px))]">
           <SearchInput value={search} onChange={setSearch} placeholder="Search name, ID, email, phone" className="sm:col-span-2 lg:col-span-1" />
-          <Select aria-label="Course" value={course} onValueChange={setCourse} options={[{ value: 'all', label: 'All courses' }, ...(filters.data?.courses ?? []).map((c) => ({ value: c, label: c }))]} />
+          <Select aria-label="Class" value={course} onValueChange={setCourse} options={[{ value: 'all', label: 'All classes' }, ...(filters.data?.courses ?? []).map((c) => ({ value: c, label: c }))]} />
           <Select aria-label="Batch" value={batch} onValueChange={setBatch} options={[{ value: 'all', label: 'All batches' }, ...(filters.data?.batches ?? []).map((c) => ({ value: c, label: c }))]} />
-          <Select aria-label="Fee status" value={feeStatus} onValueChange={setFeeStatus} options={[{ value: 'all', label: 'Any fee status' }, { value: 'overdue', label: 'Overdue' }, { value: 'outstanding', label: 'Has dues' }, { value: 'clear', label: 'All paid' }]} />
+          <Select aria-label="Fee status" value={feeStatus} onValueChange={setFeeStatus} options={[{ value: 'all', label: 'Any fee status' }, { value: 'overdue', label: 'Overdue' }, { value: 'outstanding', label: 'Has dues' }, { value: 'clear', label: 'Fully paid' }]} />
           <Select aria-label="Status" value={status} onValueChange={setStatus} options={[{ value: 'all', label: 'Any status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
         </div>
         {error && !data ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <TableSkeleton rows={8} /> : !data?.length ? (
@@ -90,21 +95,21 @@ export default function StudentsPage() {
           <>
             <div className="hidden md:block">
               <Table>
-                <THead><TR><TH>Student</TH><TH>Course &amp; batch</TH><TH>Parent</TH><TH className="text-right">Outstanding</TH><TH>Fees</TH><TH className="w-12" /></TR></THead>
+                <THead><TR><TH>Student</TH><TH>Class &amp; batch</TH><TH>Parent</TH><TH className="text-right">Outstanding</TH><TH>Fee status</TH><TH className="w-12"><span className="sr-only">Actions</span></TH></TR></THead>
                 <TBody>
                   {data.map((s) => (
-                    <TR key={s._id} className={loading ? 'opacity-60' : ''}>
+                    <TR key={s._id} className={`cursor-pointer ${loading ? 'opacity-60' : ''}`} onClick={() => setQuick(s._id)}>
                       <TD>
-                        <Link to={`/admin/students/${s._id}`} className="flex items-center gap-3">
-                          <Avatar name={s.fullName} />
-                          <span className="min-w-0"><span className="block font-medium text-slate-900 hover:text-primary">{s.fullName}</span><span className="text-xs text-muted-foreground">{s.studentId}{s.status === 'inactive' && ' · Inactive'}</span></span>
-                        </Link>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setQuick(s._id); }} className="flex items-center gap-3 text-left">
+                          <Avatar name={s.fullName} className="h-8 w-8" />
+                          <span className="min-w-0"><span className="block font-medium text-foreground hover:text-primary">{s.fullName}</span><span className="font-mono text-[11px] text-muted-foreground">{s.studentId}{s.status === 'inactive' && ' · Inactive'}</span></span>
+                        </button>
                       </TD>
                       <TD><p>{s.course}</p><p className="text-xs text-muted-foreground">{s.batch}</p></TD>
-                      <TD className="text-slate-600">{s.parent?.name ?? <span className="text-slate-400">Not linked</span>}</TD>
+                      <TD>{s.parent ? <><p>{s.parent.name}</p>{s.parent.phone && <p className="text-xs text-muted-foreground">{s.parent.phone}</p>}</> : <span className="text-slate-400">Not linked</span>}</TD>
                       <TD className="text-right tabular"><span className="font-semibold">{inr(s.fees?.outstanding)}</span>{(s.fees?.overdue ?? 0) > 0 && <span className="block text-xs text-red-600">{inr(s.fees!.overdue)} overdue</span>}</TD>
                       <TD>{FEE_BADGE[s.feeStatus ?? 'clear']}</TD>
-                      <TD>{rowMenu(s)}</TD>
+                      <TD onClick={(e) => e.stopPropagation()}>{rowMenu(s)}</TD>
                     </TR>
                   ))}
                 </TBody>
@@ -113,22 +118,23 @@ export default function StudentsPage() {
             <ul className="divide-y md:hidden">
               {data.map((s) => (
                 <li key={s._id} className="flex items-center gap-3 px-4 py-3">
-                  <Link to={`/admin/students/${s._id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <button type="button" onClick={() => setQuick(s._id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <Avatar name={s.fullName} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{s.fullName}</p>
                       <p className="truncate text-xs text-muted-foreground">{s.studentId} · {s.course}</p>
                       <div className="mt-1 flex items-center gap-2">{FEE_BADGE[s.feeStatus ?? 'clear']}{(s.fees?.outstanding ?? 0) > 0 && <span className="text-xs tabular">{inr(s.fees!.outstanding)} due</span>}</div>
                     </div>
-                  </Link>
+                  </button>
                   {rowMenu(s)}
                 </li>
               ))}
             </ul>
-            <Pagination meta={meta} onPage={setPage} />
+            <Pagination meta={meta} onPage={setPage} noun="students" />
           </>
         )}
       </Card>
+      <StudentDrawer studentId={quick} onOpenChange={(o) => !o && setQuick(null)} onChanged={reload} />
       <StudentFormDialog open={formOpen} onOpenChange={setFormOpen} student={editing} onSaved={() => { reload(); filters.reload(); }} />
       <ConfirmDialog open={!!archiving} onOpenChange={(o) => !o && setArchiving(null)} title={`Archive ${archiving?.fullName}?`} destructive confirmLabel="Archive student" loading={busy} onConfirm={archive}
         description={<>The student will be removed from active lists and their login disabled. <strong>All fee records and payment history are kept</strong> for reports and audits.</>} />

@@ -5,8 +5,8 @@ test.describe('Admin flows', () => {
   test('admin logs in and creates a student', async ({ page }) => {
     await login(page, ADMIN);
     await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Priya/ })).toBeVisible();
-    await page.getByRole('link', { name: 'Students' }).first().click();
-    await page.getByRole('button', { name: 'Add student' }).first().click();
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Students' }).click();
+    await page.getByRole('main').getByRole('button', { name: 'Add student' }).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Full name').fill('Diya Kapoor');
@@ -22,29 +22,34 @@ test.describe('Admin flows', () => {
 
     await expect(page.getByText(/Student Diya Kapoor added/)).toBeVisible();
     await page.getByPlaceholder('Search name, ID, email, phone').fill('Diya');
-    await expect(page.getByRole('link', { name: /Diya Kapoor/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Diya Kapoor/ }).first()).toBeVisible();
   });
 
   test('admin records a partial payment and the balance updates', async ({ page }) => {
     await login(page, ADMIN);
     await page.goto('/admin/students');
     await page.getByPlaceholder('Search name, ID, email, phone').fill('Rohan');
-    await page.getByRole('link', { name: /Rohan Verma/ }).first().click();
-    await expect(page.getByRole('heading', { name: 'Rohan Verma' })).toBeVisible();
+    await page.getByRole('button', { name: /Rohan Verma/ }).first().click();
+    // Quick-view drawer, then the full profile
+    const drawer = page.getByRole('dialog');
+    await expect(drawer.getByText('Unpaid fees')).toBeVisible();
+    await drawer.getByRole('link', { name: 'Full profile' }).click();
+    await expect(page).toHaveURL(/\/admin\/students\/[a-f0-9]{24}$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Rohan Verma' })).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: /NEET UG \(Monthly\) — September/ });
+    const row = page.getByRole('row').filter({ hasText: 'NEET UG (Monthly)' }).filter({ hasText: 'Sep 2026' });
     await expect(row.getByText('Overdue', { exact: true })).toBeVisible();
     await row.getByRole('button', { name: 'Record payment' }).click();
 
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Amount (₹)').fill('2500');
-    await expect(dialog.getByText('₹4,500 will remain')).toBeVisible();
+    await dialog.getByLabel('Amount received').fill('2500');
+    await expect(dialog.getByText('Remaining after').locator('..')).toContainText('₹4,500');
     // Over-payment is blocked
-    await dialog.getByLabel('Amount (₹)').fill('9000');
+    await dialog.getByLabel('Amount received').fill('9000');
     await dialog.getByRole('button', { name: /^Record/ }).click();
     await expect(dialog.getByRole('alert')).toContainText('exceeds the outstanding balance');
 
-    await dialog.getByLabel('Amount (₹)').fill('2500');
+    await dialog.getByLabel('Amount received').fill('2500');
     await dialog.getByRole('button', { name: /^Record/ }).click();
     await expect(dialog.getByRole('heading', { name: 'Payment recorded' })).toBeVisible();
     await expect(dialog.getByText(/TXN-\d{8}-/)).toBeVisible();
@@ -54,7 +59,7 @@ test.describe('Admin flows', () => {
     expect((await download).suggestedFilename()).toMatch(/^RCPT-.*\.pdf$/);
     await dialog.getByRole('button', { name: 'Close' }).first().click();
 
-    await expect(row.getByRole('cell', { name: '₹2,500', exact: true })).toBeVisible();
-    await expect(row.getByRole('cell', { name: '₹4,500', exact: true })).toBeVisible();
+    await expect(row.getByText('₹2,500', { exact: true })).toBeVisible();
+    await expect(row.getByText('₹4,500', { exact: true })).toBeVisible();
   });
 });

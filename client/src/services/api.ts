@@ -1,10 +1,17 @@
 import axios, { AxiosError } from 'axios';
 
 const TOKEN_KEY = 'cfm.token';
+/** "Keep me signed in" → localStorage; otherwise the token lives only for this browser session. */
 export const tokenStore = {
-  get: () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } },
-  set: (t: string) => { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ } },
-  clear: () => { try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } },
+  get: () => { try { return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY); } catch { return null; } },
+  set: (t: string, remember?: boolean) => {
+    try {
+      const keep = remember ?? localStorage.getItem(TOKEN_KEY) !== null;
+      (keep ? localStorage : sessionStorage).setItem(TOKEN_KEY, t);
+      (keep ? sessionStorage : localStorage).removeItem(TOKEN_KEY);
+    } catch { /* ignore */ }
+  },
+  clear: () => { try { localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } },
 };
 
 const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
@@ -35,7 +42,10 @@ export function apiError(err: unknown): ApiErrorShape {
     const e = (err.response?.data as { error?: ApiErrorShape } | undefined)?.error;
     if (e) return e;
     if (err.code === 'ECONNABORTED') return { code: 'TIMEOUT', message: 'The server took too long to respond. Please try again.' };
-    if (!err.response) return { code: 'NETWORK', message: 'Cannot reach the server. Check your connection and try again.' };
+    // No response, or a proxy/gateway error without our JSON envelope (e.g. the API is not running).
+    if (!err.response || [500, 502, 503, 504].includes(err.response.status)) {
+      return { code: 'NETWORK', message: 'Cannot reach the server. Please make sure the API is running and try again.' };
+    }
   }
   return { code: 'UNKNOWN', message: 'Something went wrong. Please try again.' };
 }
