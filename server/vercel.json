@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "buildCommand": "mkdir -p public && printf 'User-agent: *\\nDisallow: /\\n' > public/robots.txt",
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "functions": {
+    "api/index.ts": { "includeFiles": "node_modules/pdfkit/js/**" }
+  }
+}

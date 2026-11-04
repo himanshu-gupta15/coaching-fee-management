@@ -2,6 +2,8 @@
 
 **GitHub repository:** https://github.com/himanshu-gupta15/coaching-fee-management
 
+**Live app:** https://coaching-fee-management.vercel.app (API: https://coaching-fee-api.vercel.app/api/health)
+
 ## 1. Problem statement
 
 Small and mid-sized coaching institutes usually track fees in registers or spreadsheets. This causes four problems:
@@ -26,7 +28,7 @@ This system gives staff a single source of truth for fees and payments, and give
 
 ```
 ┌──────────────┐  HTTPS/JSON   ┌─────────────────────────────┐   Mongoose   ┌──────────────┐
-│ React SPA     │ ────────────▶│ Express API (Render)         │ ───────────▶ │ MongoDB Atlas │
+│ React SPA     │ ────────────▶│ Express API (Vercel)         │ ───────────▶ │ MongoDB Atlas │
 │ (Vercel)      │  Bearer JWT  │ routes → validate (Zod) →    │  sessions /  │ (replica set) │
 │ Redux, RHF    │◀──────────── │ authenticate → authorize →   │  transactions│              │
 └──────────────┘               │ controller → service         │              └──────────────┘
@@ -107,7 +109,7 @@ The API is REST and grouped by module; the full list is in the README. Conventio
   - Express 5 `simple` query parser (no nested objects in query strings), plus a body sanitiser that drops `$` and dotted keys.
   - Server-side assignment of `role` (user-supplied values are ignored).
   - Secrets only in environment variables; `.env` is git-ignored.
-- **Token storage trade-off:** the SPA and API run on different sites (Vercel and Render). Third-party cookie restrictions in Safari and Chrome make cross-site httpOnly cookies unreliable, so the token is kept in browser storage with a 1-day expiry: `localStorage` when "Keep me signed in" is ticked, otherwise `sessionStorage`. The mitigation is strict input handling and React's default escaping. Serving both from one domain would allow switching to `SameSite=Strict` httpOnly cookies.
+- **Token storage trade-off:** the SPA and API run on different sites (two separate `vercel.app` projects). Third-party cookie restrictions in Safari and Chrome make cross-site httpOnly cookies unreliable, so the token is kept in browser storage with a 1-day expiry: `localStorage` when "Keep me signed in" is ticked, otherwise `sessionStorage`. The mitigation is strict input handling and React's default escaping. Serving both from one domain would allow switching to `SameSite=Strict` httpOnly cookies.
 
 ## 7. Main workflows
 
@@ -213,7 +215,8 @@ The E2E tests cover:
 - No payment gateway, refunds, voided payments, discounts or late-fee automation.
 - No email or SMS delivery. Notifications are in-app only.
 - One parent account per student. A second guardian would need to share the login.
-- The reminder scheduler runs in-process. On sleeping free tiers it only runs while the service is awake.
+- The live API runs as a Vercel serverless function, so the in-process reminder scheduler does not run there. An admin sends reminders from **Dashboard → Send fee reminders**. On a long-running host (`server/src/index.ts`, for example with `render.yaml`) the scheduler runs while the service is awake.
+- Rate limits are held in memory, so on serverless they are counted per running instance and are looser than the configured numbers. A shared store such as Redis would make them exact.
 - Text search uses case-insensitive regex, which is fine for thousands of students. A large deployment would need Atlas Search.
 - Reports are computed live with aggregations, which is fine at institute scale.
 - JWTs are kept in browser storage, not httpOnly cookies (see section 6). There is no refresh-token rotation.
@@ -224,6 +227,6 @@ The E2E tests cover:
 - Refunds or voided payments as compensating entries, never deletions.
 - Email and WhatsApp reminders through a provider, using the existing `dedupeKey` scheme.
 - Multiple guardians per student, sibling discounts and scholarship rules.
-- A queue (BullMQ) or Render cron job for reminders. Pre-aggregated monthly summaries.
+- A scheduled job (Vercel Cron or a queue such as BullMQ) for reminders. Pre-aggregated monthly summaries.
 - An httpOnly cookie session when the client and API share a domain. Admin two-factor authentication.
 - Multi-branch (multi-tenant) support.

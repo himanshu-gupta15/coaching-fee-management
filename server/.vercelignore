@@ -1,0 +1,5 @@
+.env
+.env.*
+.mongo-data
+dist
+src/tests

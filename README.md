@@ -2,6 +2,8 @@
 
 EduLedger is a full-stack (MERN + TypeScript) system for a coaching institute (demo institute: BrightPath Academy) to manage students, fee plans, fee records, payments and receipts, with a separate portal for parents and students.
 
+**Live app:** https://coaching-fee-management.vercel.app (demo logins are in [docs/deployment.md](docs/deployment.md)).
+
 Every financial calculation happens on the backend. Amounts are stored as **integer paise**. The backend enforces role-based access on every endpoint: a parent can only ever see their own linked children.
 
 > All names, emails and phone numbers in the demo data are fictional.
@@ -56,7 +58,7 @@ Every financial calculation happens on the backend. Amounts are stored as **inte
 | Backend | Node.js, Express 5, TypeScript, Mongoose 8, Zod, JWT (HS256), bcrypt (`bcryptjs`, 12 rounds), Helmet, CORS allow-list, express-rate-limit, PDFKit |
 | Database | MongoDB Atlas (any replica set). Local dev can run on an in-memory replica set. |
 | Testing | Jest + Supertest (38 API tests), Playwright (6 E2E tests on desktop and mobile) |
-| Deploy | Vercel (client), Render (API), MongoDB Atlas |
+| Deploy | Vercel (client and API), MongoDB Atlas. A Render blueprint is included as an alternative for the API. |
 
 ```
 coaching-fee-management/
@@ -64,7 +66,7 @@ coaching-fee-management/
 ├── server/            Express API (src/config, controllers, middleware, models, routes, services, validators, utils, seed, tests)
 ├── e2e/               Playwright specs
 ├── docs/              TDD.md, deployment.md, screenshots
-├── render.yaml        Render blueprint for the API
+├── render.yaml        Render blueprint for the API (alternative host)
 └── playwright.config.ts
 ```
 
@@ -120,7 +122,7 @@ npm run dev      # API :5001 + web :5173 (Vite proxies /api to the API)
 
 | Name | Purpose |
 |---|---|
-| `VITE_API_URL` | API base URL, e.g. `https://your-api.onrender.com`. Leave empty in local dev. |
+| `VITE_API_URL` | API base URL, e.g. `https://your-api.vercel.app`. Leave empty in local dev. |
 
 ---
 
@@ -196,4 +198,4 @@ See [docs/TDD.md](docs/TDD.md) for the design and [docs/deployment.md](docs/depl
 - **No payment gateway.** Online payments are entered manually after staff check them.
 - **No refunds or voided payments.** Payments are append-only. A correction requires adjusting the fee amount, which is audited.
 - **Reminder job runs in-process** every 6 hours. On free hosting tiers that sleep, use the "Send fee reminders" button or an external cron job.
-- **JWT is stored in browser storage** (`localStorage` with "Keep me signed in", otherwise `sessionStorage`) to support Vercel and Render on different origins. See the trade-offs in TDD.md.
+- **JWT is stored in browser storage** (`localStorage` with "Keep me signed in", otherwise `sessionStorage`) to support the web app and API running on different origins. See the trade-offs in TDD.md.

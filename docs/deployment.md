@@ -1,6 +1,14 @@
 # Deployment Guide
 
-Target: **MongoDB Atlas** (database), **Render** (API), **Vercel** (web app).
+## Live deployment
+
+| Part | Host | URL |
+|---|---|---|
+| Web app | Vercel | https://coaching-fee-management.vercel.app |
+| API | Vercel (serverless function) | https://coaching-fee-api.vercel.app/api/health |
+| Database | MongoDB Atlas free tier, connected through the Vercel integration | Not public |
+
+Demo logins are in section 6. The API can be hosted on Vercel (section 3, Option C, used for the live deployment) or on Render (Options A and B).
 
 ## 1. Local setup
 
@@ -82,6 +90,18 @@ cd server && MONGODB_URI="<atlas uri>" NODE_ENV=production SEED_CONFIRM=yes npm 
 The seed refuses to run in production unless `SEED_CONFIRM=yes` is set.
 
 > **Free-tier note:** Render free services sleep when idle, so the first request can take around 30–50 seconds. The in-process reminder job only runs while the service is awake. Use **Dashboard → Send fee reminders**, or schedule an external cron job.
+
+**Option C: Vercel (used for the live deployment).** Create a Vercel project with `server` as its root directory. `server/vercel.json` and `server/api/index.ts` route every request to the Express app.
+
+```bash
+cd server
+npx vercel@latest link --project coaching-fee-api
+npx vercel@latest integration add mongodbatlas --meta clusterTier=FREE -e production   # sets MONGODB_URI
+npx vercel@latest env add JWT_SECRET production     # repeat for the variables listed above
+npx vercel@latest deploy --prod
+```
+
+Do not set `PORT`. Add the Atlas integration before the first real deploy, or redeploy afterwards so the API picks up `MONGODB_URI`. The in-process reminder job does not run on serverless, so send reminders from **Dashboard → Send fee reminders**. Rate limits are counted per running instance.
 
 ## 4. Frontend on Vercel
 
