@@ -18,7 +18,7 @@ const sName = (p: Payment) => (typeof p.student === 'object' ? p.student.fullNam
 const fTitle = (p: Payment) => (typeof p.feeRecord === 'object' ? p.feeRecord.title : '');
 
 export function MethodBadge({ method }: { method: Payment['method'] }) {
-  return <Badge variant={method === 'online_manual' ? 'warning' : method === 'cash' ? 'neutral' : 'info'} title={method === 'online_manual' ? 'Recorded manually, not verified by a payment gateway' : undefined}>{METHOD_LABEL[method]}</Badge>;
+  return <Badge variant="outline" title={method === 'online_manual' ? 'Recorded manually, not verified by a payment gateway' : undefined}>{method === 'online_manual' ? 'Online · manual' : METHOD_LABEL[method]}</Badge>;
 }
 
 /** Payments as a table on desktop and stacked cards on mobile. */

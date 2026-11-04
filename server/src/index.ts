@@ -22,8 +22,18 @@ export async function start(uri = env.MONGODB_URI) {
 
 if (require.main === module) {
   start().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start server', err);
+    if (err?.name === 'MongooseServerSelectionError') {
+      const target = env.MONGODB_URI.replace(/\/\/[^@]*@/, '//***@');
+      // eslint-disable-next-line no-console
+      console.error(
+        `\nCould not connect to MongoDB at ${target}\n\n` +
+          '  • No MongoDB installed? Run `npm run dev:memory` instead (in-memory DB, auto-seeded).\n' +
+          '  • Using Atlas? Set MONGODB_URI in server/.env and check Network Access allows your IP.\n',
+      );
+    } else {
+      // eslint-disable-next-line no-console
+      console.error('Failed to start server', err);
+    }
     process.exit(1);
   });
 }

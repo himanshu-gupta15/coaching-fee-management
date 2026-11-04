@@ -1,4 +1,4 @@
-# Technical Design Document: Coaching Fee Management System
+# Technical Design Document: EduLedger (Coaching Fee Management System)
 
 ## 1. Problem statement
 
@@ -157,8 +157,9 @@ The API is REST and grouped by module; the full list is in the README. Conventio
 
 ## 9. UI/UX decisions
 
-- **Visual style:** a neutral `#f7f8fa` canvas, white cards with subtle shadows, an indigo accent, the Inter font, and tabular figures for every amount.
-- **Admin layout:** a dark sidebar (Linear-style) that becomes a slide-in drawer below `lg`.
+- **Visual style:** follows the EduLedger UI design canvas. A `#f8f9fc` canvas, white bordered cards, an indigo accent (`#4f46e5`) with navy (`#1b2033`) for brand and secondary actions, the Inter font, and tabular figures for every amount.
+- **Admin layout:** a light sidebar with Main and Workspace sections, a collapse-to-icons control and a user card. The top bar has a breadcrumb, a student search (`/` to focus) and an "Add student" button. The sidebar becomes a slide-in drawer below `lg`.
+- **Student quick view:** a right-hand drawer with the outstanding balance, unpaid fees (each opens Record payment) and key details.
 - **Parent and student layout:** a simple top navigation on desktop and a **bottom tab bar** on phones (Home, Payments, Notices, Alerts). This suits non-technical parents.
 - **Tables:** every data table switches to stacked cards on mobile. The layout is not just a shrunken desktop table.
 - **Dialogs:** they become bottom sheets on phones.
@@ -181,7 +182,7 @@ The API is REST and grouped by module; the full list is in the README. Conventio
 
 | Level | Tooling | Scope |
 |---|---|---|
-| API / integration | Jest + Supertest + `mongodb-memory-server` replica set | 37 tests, each test file on its own seeded database. See the list below. |
+| API / integration | Jest + Supertest + `mongodb-memory-server` replica set | 38 tests, each test file on its own seeded database. See the list below. |
 | End-to-end | Playwright (Chromium; desktop and Pixel 7) | Boots a fresh in-memory database, the API and Vite. Covers the four flows listed below. |
 | Manual | Screenshot sweep with Playwright at 1440 px and 390 px | Layout overflow, no console errors |
 

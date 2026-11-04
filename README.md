@@ -1,6 +1,6 @@
-# BrightPath — Coaching Institute Fee Management & Parent Portal
+# EduLedger — Coaching Institute Fee Management & Parent Portal
 
-A full-stack (MERN + TypeScript) system for a coaching institute to manage students, fee plans, fee records, payments and receipts, with a separate portal for parents and students.
+EduLedger is a full-stack (MERN + TypeScript) system for a coaching institute (demo institute: BrightPath Academy) to manage students, fee plans, fee records, payments and receipts, with a separate portal for parents and students.
 
 Every financial calculation happens on the backend. Amounts are stored as **integer paise**. The backend enforces role-based access on every endpoint: a parent can only ever see their own linked children.
 
@@ -55,7 +55,7 @@ Every financial calculation happens on the backend. Amounts are stored as **inte
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn-style components on Radix UI, Lucide icons, React Router 7, Redux Toolkit, Axios, React Hook Form + Zod, Recharts, Sonner toasts |
 | Backend | Node.js, Express 5, TypeScript, Mongoose 8, Zod, JWT (HS256), bcrypt (`bcryptjs`, 12 rounds), Helmet, CORS allow-list, express-rate-limit, PDFKit |
 | Database | MongoDB Atlas (any replica set). Local dev can run on an in-memory replica set. |
-| Testing | Jest + Supertest (37 API tests), Playwright (6 E2E tests on desktop and mobile) |
+| Testing | Jest + Supertest (38 API tests), Playwright (6 E2E tests on desktop and mobile) |
 | Deploy | Vercel (client), Render (API), MongoDB Atlas |
 
 ```
@@ -147,7 +147,7 @@ The seed data is generated relative to today: 6 months of fees, 36 fee records, 
 ## Testing
 
 ```bash
-npm test            # Jest + Supertest against an in-memory replica set (37 tests)
+npm test            # Jest + Supertest against an in-memory replica set (38 tests)
 npm run test:e2e    # Playwright: boots a fresh seeded API + web app (6 tests, desktop + mobile)
 ```
 

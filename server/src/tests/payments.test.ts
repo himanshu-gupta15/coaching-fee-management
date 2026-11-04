@@ -52,6 +52,18 @@ describe('Partial payments and balances', () => {
     }
   });
 
+  it("accepts a payment dated today at any time of day, and rejects tomorrow's date", async () => {
+    const { t, fee } = await freshFee();
+    const offset = Number(process.env.INSTITUTE_TZ_OFFSET_MINUTES ?? 330) * 60_000;
+    const today = new Date(Date.now() + offset).toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + offset + 86_400_000).toISOString().slice(0, 10);
+    const ok = await api().post('/api/payments').set(auth(t)).send({ feeRecordId: fee._id, amount: 1000, method: 'cash', paidAt: today, idempotencyKey: key() });
+    expect(ok.status).toBe(201);
+    expect(new Date(ok.body.data.payment.paidAt).getTime()).toBeLessThanOrEqual(Date.now());
+    const future = await api().post('/api/payments').set(auth(t)).send({ feeRecordId: fee._id, amount: 1000, method: 'cash', paidAt: tomorrow, idempotencyKey: key() });
+    expect(future.status).toBe(422);
+  });
+
   it('rejects payment on a fully paid fee', async () => {
     const { t, fee } = await freshFee(5000);
     await api().post('/api/payments').set(auth(t)).send({ feeRecordId: fee._id, amount: 5000, method: 'cash', idempotencyKey: key() });

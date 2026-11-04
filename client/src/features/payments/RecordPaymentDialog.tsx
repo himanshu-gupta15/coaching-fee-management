@@ -3,12 +3,12 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, Download } from 'lucide-react';
+import { AlertTriangle, Banknote, Building2, CheckCircle2, Download, Smartphone } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Field, StatusBadge } from '@/components/common';
+import { Field, ProgressBar, StatusBadge } from '@/components/common';
+import { cn } from '@/lib/utils';
 import { api, apiError, downloadFile } from '@/services/api';
 import { useApi, useDebounced } from '@/hooks/useApi';
 import { fmtDate, inr, isoDay, paiseToRupeeInput, rupeesToPaise } from '@/utils/format';
@@ -24,6 +24,12 @@ const schema = z
   })
   .refine((v) => v.method === 'cash' || (v.reference && v.reference.length >= 3), { path: ['reference'], message: 'Reference / UTR is required for bank and online payments' });
 type FormValues = z.infer<typeof schema>;
+
+const METHODS = [
+  { value: 'cash', label: 'Cash', sub: 'At the office', icon: Banknote },
+  { value: 'bank_transfer', label: 'Bank transfer', sub: 'NEFT / IMPS', icon: Building2 },
+  { value: 'online_manual', label: 'UPI / card', sub: 'Manual entry', icon: Smartphone },
+] as const;
 
 interface Props {
   open: boolean;
@@ -144,13 +150,13 @@ export function RecordPaymentDialog({ open, onOpenChange, fee: initialFee, stude
           <>
             <DialogHeader>
               <DialogTitle>Record payment</DialogTitle>
-              <DialogDescription>Record a payment received at the office. Balances are verified on the server.</DialogDescription>
+              <DialogDescription>Enter what was received. Balances are re-checked on the server before saving.</DialogDescription>
             </DialogHeader>
             {!fee ? (
               <FeePicker onPick={(f) => { setFee(f); setValue('amount', paiseToRupeeInput(f.balance)); }} />
             ) : (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                <div className="rounded-lg border bg-slate-50/60 p-3">
+                <div className="rounded-lg border p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{fee.title}</p>
@@ -158,42 +164,60 @@ export function RecordPaymentDialog({ open, onOpenChange, fee: initialFee, stude
                     </div>
                     <StatusBadge status={fee.effectiveStatus} />
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <div><p className="text-muted-foreground">Fee</p><p className="font-semibold tabular text-sm">{inr(fee.amount)}</p></div>
-                    <div><p className="text-muted-foreground">Paid</p><p className="font-semibold tabular text-sm">{inr(fee.amountPaid)}</p></div>
-                    <div><p className="text-muted-foreground">Outstanding</p><p className="font-semibold tabular text-sm text-primary">{inr(fee.balance)}</p></div>
-                  </div>
                   {!initialFee && <button type="button" className="mt-2 text-xs font-medium text-primary hover:underline" onClick={() => setFee(null)}>Choose a different fee</button>}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Amount (₹)" htmlFor="amount" error={errors.amount?.message} required
-                    hint={remaining !== null && remaining >= 0 ? (remaining === 0 ? 'Clears this fee in full' : `${inr(remaining)} will remain`) : undefined}>
-                    <div className="flex gap-2">
-                      <Input id="amount" inputMode="decimal" autoComplete="off" {...register('amount')} aria-invalid={!!errors.amount} />
-                      <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setValue('amount', paiseToRupeeInput(fee.balance))}>Full</Button>
+                  <Field label="Amount received" htmlFor="amount" error={errors.amount?.message} required>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input id="amount" inputMode="decimal" autoComplete="off" className="pl-7 pr-14" {...register('amount')} aria-invalid={!!errors.amount} />
+                      <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary-soft" onClick={() => setValue('amount', paiseToRupeeInput(fee.balance))}>Full</button>
                     </div>
                   </Field>
                   <Field label="Payment date" htmlFor="paidAt" error={errors.paidAt?.message} required>
                     <Input id="paidAt" type="date" max={isoDay()} {...register('paidAt')} />
                   </Field>
-                  <Field label="Method" htmlFor="method" required>
-                    <Controller control={control} name="method" render={({ field }) => (
-                      <Select id="method" value={field.value} onValueChange={field.onChange} options={[
-                        { value: 'cash', label: 'Cash' }, { value: 'bank_transfer', label: 'Bank transfer' }, { value: 'online_manual', label: 'Online (UPI/card) — manual entry' },
-                      ]} />
-                    )} />
-                  </Field>
-                  <Field label={method === 'cash' ? 'Reference (optional)' : 'Reference / UTR'} htmlFor="reference" error={errors.reference?.message} required={method !== 'cash'}>
-                    <Input id="reference" placeholder={method === 'cash' ? 'Cash book no.' : 'e.g. UTR123456789'} {...register('reference')} aria-invalid={!!errors.reference} />
-                  </Field>
                 </div>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium text-slate-700">Payment method<span className="text-destructive"> *</span></legend>
+                  <Controller control={control} name="method" render={({ field }) => (
+                    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Payment method">
+                      {METHODS.map((m) => {
+                        const on = field.value === m.value;
+                        return (
+                          <button key={m.value} type="button" role="radio" aria-checked={on} onClick={() => field.onChange(m.value)}
+                            className={cn('flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors sm:p-3', on ? 'border-primary bg-primary-soft/60 ring-1 ring-primary' : 'hover:bg-muted/60')}>
+                            <m.icon className={cn('h-4 w-4', on ? 'text-primary' : 'text-slate-500')} />
+                            <span className="text-[13px] font-medium leading-tight sm:text-sm">{m.label}</span>
+                            <span className="text-[11px] text-muted-foreground">{m.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )} />
+                </fieldset>
+                <Field label={method === 'cash' ? 'Reference (optional)' : 'Transaction reference / UTR'} htmlFor="reference" error={errors.reference?.message} required={method !== 'cash'}
+                  hint={method === 'cash' ? 'e.g. cash book entry number' : 'As shown in the bank statement or UPI app.'}>
+                  <Input id="reference" className="font-mono" placeholder={method === 'cash' ? 'Optional' : 'e.g. 412398765432'} {...register('reference')} aria-invalid={!!errors.reference} />
+                </Field>
                 {method === 'online_manual' && (
                   <p className="flex gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
-                    This system has no payment gateway. Only record online payments you have verified in the institute's bank statement. It will be labelled as a manual entry on the receipt.
+                    There is no payment gateway. Only record online payments you have verified in the institute's bank statement. The receipt will say it was a manual entry.
                   </p>
                 )}
-                <Field label="Notes (optional)" htmlFor="notes"><Textarea id="notes" rows={2} {...register('notes')} /></Field>
+                <div className="rounded-lg bg-muted/70 p-3.5 text-sm">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Balance preview</p>
+                  <dl className="space-y-1.5">
+                    <div className="flex justify-between"><dt className="text-slate-600">Fee total</dt><dd className="tabular">{inr(fee.amount)}</dd></div>
+                    <div className="flex justify-between"><dt className="text-slate-600">Paid before</dt><dd className="tabular">{inr(fee.amountPaid)}</dd></div>
+                    <div className="flex justify-between"><dt className="text-slate-600">This payment</dt><dd className="tabular">– {inr(amountPaise ?? 0)}</dd></div>
+                    <div className="mt-1 flex justify-between border-t pt-2 font-medium"><dt>Remaining after</dt>
+                      <dd className={cn('text-base font-semibold tabular', remaining !== null && remaining < 0 && 'text-red-600')}>{remaining === null ? '—' : remaining < 0 ? `Exceeds by ${inr(-remaining)}` : inr(remaining)}</dd></div>
+                  </dl>
+                  <ProgressBar className="mt-3" value={((fee.amountPaid + Math.max(0, amountPaise ?? 0)) / fee.amount) * 100} />
+                </div>
+                <Field label="Notes (optional)" htmlFor="notes"><Textarea id="notes" rows={2} placeholder="e.g. Paid at the front desk" {...register('notes')} /></Field>
                 {serverError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{serverError}</p>}
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
