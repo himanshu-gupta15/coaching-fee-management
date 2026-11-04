@@ -196,4 +196,4 @@ See [docs/TDD.md](docs/TDD.md) for the design and [docs/deployment.md](docs/depl
 - **No payment gateway.** Online payments are entered manually after staff check them.
 - **No refunds or voided payments.** Payments are append-only. A correction requires adjusting the fee amount, which is audited.
 - **Reminder job runs in-process** every 6 hours. On free hosting tiers that sleep, use the "Send fee reminders" button or an external cron job.
-- **JWT is stored in `localStorage`** to support Vercel and Render on different origins. See the trade-offs in TDD.md.
+- **JWT is stored in browser storage** (`localStorage` with "Keep me signed in", otherwise `sessionStorage`) to support Vercel and Render on different origins. See the trade-offs in TDD.md.

@@ -1,5 +1,7 @@
 # Technical Design Document: EduLedger (Coaching Fee Management System)
 
+**GitHub repository:** https://github.com/himanshu-gupta15/coaching-fee-management
+
 ## 1. Problem statement
 
 Small and mid-sized coaching institutes usually track fees in registers or spreadsheets. This causes four problems:
@@ -105,7 +107,7 @@ The API is REST and grouped by module; the full list is in the README. Conventio
   - Express 5 `simple` query parser (no nested objects in query strings), plus a body sanitiser that drops `$` and dotted keys.
   - Server-side assignment of `role` (user-supplied values are ignored).
   - Secrets only in environment variables; `.env` is git-ignored.
-- **Token storage trade-off:** the SPA and API run on different sites (Vercel and Render). Third-party cookie restrictions in Safari and Chrome make cross-site httpOnly cookies unreliable, so the token is kept in `localStorage`, with a 1-day expiry. The mitigation is strict input handling and React's default escaping. Serving both from one domain would allow switching to `SameSite=Strict` httpOnly cookies.
+- **Token storage trade-off:** the SPA and API run on different sites (Vercel and Render). Third-party cookie restrictions in Safari and Chrome make cross-site httpOnly cookies unreliable, so the token is kept in browser storage with a 1-day expiry: `localStorage` when "Keep me signed in" is ticked, otherwise `sessionStorage`. The mitigation is strict input handling and React's default escaping. Serving both from one domain would allow switching to `SameSite=Strict` httpOnly cookies.
 
 ## 7. Main workflows
 
@@ -214,7 +216,7 @@ The E2E tests cover:
 - The reminder scheduler runs in-process. On sleeping free tiers it only runs while the service is awake.
 - Text search uses case-insensitive regex, which is fine for thousands of students. A large deployment would need Atlas Search.
 - Reports are computed live with aggregations, which is fine at institute scale.
-- JWTs are kept in `localStorage` (see section 6). There is no refresh-token rotation.
+- JWTs are kept in browser storage, not httpOnly cookies (see section 6). There is no refresh-token rotation.
 
 ## 12. Future improvements
 
